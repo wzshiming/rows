@@ -24,14 +24,14 @@ var (
 
 func TestRows(t *testing.T) {
 	d0 := []Hw{}
-	err := DataScan(key, data, &d0, MakeFieldName("sql"))
+	err := DataScanBytes(key, data, &d0, MakeFieldName("sql"))
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
 	var d1 *[]*Hw
-	err = DataScan(key, data, &d1, MakeFieldName("sql"))
+	err = DataScanBytes(key, data, &d1, MakeFieldName("sql"))
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -50,7 +50,7 @@ func TestRows(t *testing.T) {
 	}
 
 	d2 := []*Hw{}
-	err = DataScan(key, data, &d2, MakeFieldName("sql"))
+	err = DataScanBytes(key, data, &d2, MakeFieldName("sql"))
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -69,7 +69,7 @@ func TestRows(t *testing.T) {
 	}
 
 	var d3 *Hw
-	err = DataScan(key, data, &d3, MakeFieldName("sql"))
+	err = DataScanBytes(key, data, &d3, MakeFieldName("sql"))
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -81,7 +81,7 @@ func TestRows(t *testing.T) {
 	}
 
 	var d4 Hw
-	err = DataScan(key, data, &d4, MakeFieldName("sql"))
+	err = DataScanBytes(key, data, &d4, MakeFieldName("sql"))
 	if err != nil {
 		t.Fatal(err)
 		return

@@ -1,9 +1,8 @@
 package rows
 
 import (
-	"go/ast"
+	"fmt"
 	"reflect"
-	"strings"
 )
 
 type Rows interface {
@@ -35,170 +34,57 @@ func RowsScan(rows Rows, v interface{}, fn func(reflect.StructField) string) (in
 	default:
 		limit = 1
 	}
-	key, data, err := RowsLimit(rows, limit)
+	key, data, err := RowsLimitChannel(rows, limit)
 	if err != nil {
 		return 0, err
 	}
 
-	err = DataScan(key, data, v, fn)
+	err = DataScanChannel(key, data, v, fn)
 	if err != nil {
 		return 0, err
 	}
 	return len(data), nil
 }
 
-// RowsLimit
-// if limit >= 0 Read maximum rows limit
-// else < 0 Not limited
-func RowsLimit(rows Rows, limit int) ([]string, [][][]byte, error) {
+// rowsLimit
+func rowsLimit(rows Rows, limit int, g bool, df func(d [][]byte)) ([]string, error) {
 	if limit == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 	if !rows.Next() {
-		return nil, nil, nil
+		return nil, nil
 	}
 	key, err := rows.Columns()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	keysize := len(key)
 	if keysize == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
-	ms := 1024
-	if limit > 0 {
-		ms = limit
-	}
-	data := make([][][]byte, 0, ms)
-
-	for i := 0; i != limit; i++ {
-		r := makeBytesInterface(keysize)
-		if err := rows.Scan(r...); err != nil {
-			return nil, nil, err
-		}
-		data = append(data, rowsInterfaceToByte(r))
-		if !rows.Next() {
-			break
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, nil, err
-	}
-	return key, data, nil
-}
-
-// DataScan
-// v should be a pointer type.
-// Support type:
-//  Base Type
-//  struct
-//  *struct
-//  map[string]string
-//  *map[string]string
-//  map[string][]byte
-//  *map[string][]byte
-// List type:
-//  []
-//  [len]
-// Example:
-//  [100]map[string]string   Get 100 lines to map
-//  map[string]string        Get 1 lines to map
-//  []*struct                All to *struct
-//  *[100]struct             Get 100 lines to struct
-//
-// var ret [100]map[string]string
-// DataScan(key, data, &ret)
-func DataScan(key []string, data [][][]byte, v interface{}, fn func(reflect.StructField) string) error {
-	if len(data) == 0 || len(key) == 0 {
-		return nil
-	}
-
-	val := reflect.ValueOf(v)
-	return rowsScanValues(key, data, val, fn)
-}
-
-// rowsScanValues rows scan values
-func rowsScanValues(key []string, data [][][]byte, val reflect.Value, fn func(reflect.StructField) string) error {
-	switch val.Kind() {
-	default:
-		return ErrInvalidType
-	case reflect.Ptr:
-		if val.IsNil() {
-			val.Set(reflect.New(val.Type().Elem()))
-		}
-		return rowsScanValues(key, data, val.Elem(), fn)
-	case reflect.Slice:
-		l := len(data)
-		val.Set(reflect.MakeSlice(val.Type(), l, l))
-		fallthrough
-	case reflect.Array:
-		return rowsScanValue(key, data, val, fn)
-	case reflect.Struct:
-		key0 := colAdjust(val.Type(), key, fn)
-		return rowScanStruct(key0, data[0], val)
-	case reflect.Map:
-		return rowScanMap(key, data[0], val)
-	}
-}
-
-// rowsScanValue rows scan value
-func rowsScanValue(key []string, data [][][]byte, val reflect.Value, fn func(reflect.StructField) string) error {
-	tt := val.Type().Elem()
-	ps := 0
-	for tt.Kind() == reflect.Ptr {
-		tt = tt.Elem()
-		ps++
-	}
-	ml := val.Len()
-	if len(data) < ml {
-		ml = len(data)
-	}
-	switch tt.Kind() {
-	default:
-		return ErrInvalidType
-	case reflect.Struct:
-		key0 := colAdjust(tt, key, fn)
-		for k, v := range data[:ml] {
-			d := reflect.New(tt).Elem()
-
-			if err := rowScanStruct(key0, v, d); err != nil {
-				return err
+	ff := func() {
+		for i := 0; i != limit; i++ {
+			r := makeBytesInterface(keysize)
+			if err := rows.Scan(r...); err != nil {
+				fmt.Sprintln(err)
+				break
 			}
 
-			for i := 0; i != ps; i++ {
-				d = d.Addr()
+			df(rowsInterfaceToByte(r))
+			if !rows.Next() {
+				break
 			}
-			val.Index(k).Set(d)
 		}
-	case reflect.Map:
-		for k, v := range data[:ml] {
-			d := reflect.New(tt).Elem()
-
-			if err := rowScanMap(key, v, d); err != nil {
-				return err
-			}
-
-			for i := 0; i != ps; i++ {
-				d = d.Addr()
-			}
-			val.Index(k).Set(d)
-		}
-
-	case reflect.Slice:
-		for k, v := range data[:ml] {
-			d := reflect.New(tt).Elem()
-			if err := rowScanSlice(key, v, d); err != nil {
-				return err
-			}
-			for i := 0; i != ps; i++ {
-				d = d.Addr()
-			}
-			val.Index(k).Set(d)
-		}
+		df(nil)
 	}
-	return nil
+	if g {
+		go ff()
+	} else {
+		ff()
+	}
+
+	return key, nil
 }
 
 // rowScanSlice row scan Slice
@@ -386,57 +272,18 @@ func rowsInterfaceToByte(m []interface{}) [][]byte {
 	return r0
 }
 
-// colAdjust Adjust col
-func colAdjust(tt reflect.Type, key []string, fn func(reflect.StructField) string) [][]string {
-	m := map[string]int{}
-	for i, v := range key {
-		m[v] = i
-	}
-	rk := make([][]string, len(key))
-	colAdjustMap(tt, key, nil, m, rk, fn)
-	return rk
-}
-
-// colAdjustMap Adjust col map
-func colAdjustMap(tt reflect.Type, key []string, prefix []string, m map[string]int, rk [][]string,
-	ff func(reflect.StructField) string) bool {
-	b := false
-	nf := tt.NumField()
-	for i := 0; i != nf; i++ {
-		fi := tt.Field(i)
-		tv := ff(fi)
-		if tv == "" {
-			continue
-		}
-
-		if fi.Anonymous && fi.Type.Kind() == reflect.Struct &&
-			colAdjustMap(fi.Type, key, append(prefix, fi.Name), m, rk, ff) {
-			continue
-		}
-
-		if !ast.IsExported(fi.Name) {
-			continue
-		}
-
-		if k, ok := m[tv]; ok && len(rk[k]) == 0 {
-			rk[k] = append(prefix, fi.Name)
-			b = true
-		}
-	}
-
-	return b
-}
-
-func MakeFieldName(tag string) func(fn reflect.StructField) string {
-	return func(fn reflect.StructField) string {
-		b := fn.Tag.Get(tag)
-		dd := strings.Split(b, ",")[0]
-		if dd == "-" {
-			return ""
-		}
-		if dd == "" {
-			return Hump2Snake(fn.Name)
-		}
-		return dd
+func rowsScanValueFunc(tt reflect.Type, key []string, fn func(reflect.StructField) string) (func(key []string, d [][]byte, val reflect.Value) error, error) {
+	switch tt.Kind() {
+	default:
+		return nil, ErrInvalidType
+	case reflect.Struct:
+		key0 := colAdjust(tt, key, fn)
+		return func(key []string, d [][]byte, val reflect.Value) error {
+			return rowScanStruct(key0, d, val)
+		}, nil
+	case reflect.Map:
+		return rowScanMap, nil
+	case reflect.Slice:
+		return rowScanSlice, nil
 	}
 }
