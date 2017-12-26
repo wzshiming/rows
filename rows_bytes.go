@@ -2,27 +2,6 @@ package rows
 
 import "reflect"
 
-// DataScan
-// v should be a pointer type.
-// Support type:
-//  Base Type
-//  struct
-//  *struct
-//  map[string]string
-//  *map[string]string
-//  map[string][]byte
-//  *map[string][]byte
-// List type:
-//  []
-//  [len]
-// Example:
-//  [100]map[string]string   Get 100 lines to map
-//  map[string]string        Get 1 lines to map
-//  []*struct                All to *struct
-//  *[100]struct             Get 100 lines to struct
-//
-// var ret [100]map[string]string
-// DataScan(key, data, &ret)
 func DataScanBytes(key []string, data [][][]byte, v interface{}, fn func(reflect.StructField) string) error {
 	if len(data) == 0 || len(key) == 0 {
 		return nil
@@ -76,6 +55,11 @@ func RowsScanBytes(rows Rows, v interface{}, fn func(reflect.StructField) string
 	default:
 		limit = 1
 	}
+	return rowsScanBytes(rows, v, limit, fn)
+}
+
+func rowsScanBytes(rows Rows, v interface{}, limit int,
+	fn func(reflect.StructField) string) (int, error) {
 	key, data, err := RowsLimitBytes(rows, limit)
 	if err != nil {
 		return 0, err
@@ -96,17 +80,21 @@ func rowsScanValueBytes(key []string, data [][][]byte, val reflect.Value, fn fun
 		tt = tt.Elem()
 		ps++
 	}
-	ml := val.Len()
-	if len(data) < ml {
-		ml = len(data)
-	}
 
 	rs, err := rowsScanValueFunc(tt, key, fn)
 	if err != nil {
 		return err
 	}
 
-	for k, v := range data[:ml] {
+	if val.Len() == 0 {
+		if val.Kind() == reflect.Slice {
+			val.Set(reflect.MakeSlice(val.Type(), len(data), len(data)))
+		} else {
+			return nil
+		}
+	}
+
+	for k, v := range data {
 		d := reflect.New(tt).Elem()
 		if err := rs(key, v, d); err != nil {
 			return err
@@ -130,8 +118,6 @@ func rowsScanValuesBytes(key []string, data [][][]byte, val reflect.Value, fn fu
 		}
 		return rowsScanValuesBytes(key, data, val.Elem(), fn)
 	case reflect.Slice:
-		l := len(data)
-		val.Set(reflect.MakeSlice(val.Type(), l, l))
 		fallthrough
 	case reflect.Array:
 		return rowsScanValueBytes(key, data, val, fn)

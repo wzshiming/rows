@@ -12,7 +12,29 @@ type Rows interface {
 	Err() error
 }
 
-func RowsScan(rows Rows, v interface{}, fn func(reflect.StructField) string) (int, error) {
+// DataScan
+// v should be a pointer type.
+// Support type:
+//  Base Type
+//  struct
+//  *struct
+//  map[string]string
+//  *map[string]string
+//  map[string][]byte
+//  *map[string][]byte
+// List type:
+//  []
+//  [len]
+// Example:
+//  [100]map[string]string   Get 100 lines to map
+//  map[string]string        Get 1 lines to map
+//  []*struct                All to *struct
+//  *[100]struct             Get 100 lines to struct
+//
+// var ret [100]map[string]string
+// DataScan(key, data, &ret)
+func RowsScan(rows Rows, v interface{},
+	fn func(reflect.StructField) string, f int) (int, error) {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr {
 		return 0, ErrNotPointer
@@ -29,21 +51,24 @@ func RowsScan(rows Rows, v interface{}, fn func(reflect.StructField) string) (in
 	switch val.Kind() {
 	case reflect.Array:
 		limit = val.Len()
+		if limit == 1 {
+			f = 0
+		}
 	case reflect.Slice:
 		limit = -1
 	default:
 		limit = 1
-	}
-	key, data, err := RowsLimitChannel(rows, limit)
-	if err != nil {
-		return 0, err
+		f = 0
 	}
 
-	err = DataScanChannel(key, data, v, fn)
-	if err != nil {
-		return 0, err
+	if f == 0 {
+		return rowsScanBytes(rows, v, limit, fn)
+	} else if f > 0 {
+		return rowsScanChannel(rows, v, limit, fn, f)
+	} else {
+		return rowsScanChannel(rows, v, limit, fn, 3)
 	}
-	return len(data), nil
+	return 0, nil
 }
 
 // rowsLimit

@@ -12,13 +12,14 @@ var (
 	MaxBuffer    = 1024
 )
 
-func DataScanChannel(key []string, data chan [][]byte, v interface{}, fn func(reflect.StructField) string) error {
+func DataScanChannel(key []string, data chan [][]byte, v interface{},
+	fn func(reflect.StructField) string, f int) error {
 	if len(key) == 0 {
 		return nil
 	}
 
 	val := reflect.ValueOf(v)
-	return rowsScanValuesChannel(key, data, val, fn)
+	return rowsScanValuesChannel(key, data, val, fn, f)
 }
 
 // RowsLimitChannel
@@ -39,7 +40,8 @@ func RowsLimitChannel(rows Rows, limit int) ([]string, chan [][]byte, error) {
 	return key, data, nil
 }
 
-func RowsScanChannel(rows Rows, v interface{}, fn func(reflect.StructField) string) (int, error) {
+func RowsScanChannel(rows Rows, v interface{},
+	fn func(reflect.StructField) string, f int) (int, error) {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr {
 		return 0, ErrNotPointer
@@ -61,12 +63,20 @@ func RowsScanChannel(rows Rows, v interface{}, fn func(reflect.StructField) stri
 	default:
 		limit = 1
 	}
+	return rowsScanChannel(rows, v, limit, fn, f)
+}
+
+func rowsScanChannel(rows Rows, v interface{}, limit int,
+	fn func(reflect.StructField) string, f int) (int, error) {
 	key, data, err := RowsLimitChannel(rows, limit)
 	if err != nil {
 		return 0, err
 	}
 
-	err = DataScanChannel(key, data, v, fn)
+	if f--; f < 1 {
+		f = 1
+	}
+	err = DataScanChannel(key, data, v, fn, f)
 	if err != nil {
 		return 0, err
 	}
@@ -74,7 +84,8 @@ func RowsScanChannel(rows Rows, v interface{}, fn func(reflect.StructField) stri
 }
 
 // rowsScanValueChannel rows scan value
-func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value, fn func(reflect.StructField) string) error {
+func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
+	fn func(reflect.StructField) string, f int) error {
 	tt := val.Type().Elem()
 	ps := 0
 	for tt.Kind() == reflect.Ptr {
@@ -87,11 +98,19 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value, f
 		return err
 	}
 
-	fo := fork.NewForkBuf(MaxForkSize, MaxForkSize)
-	k := 0
-	if val.Len() == 0 && val.Kind() == reflect.Slice {
-		val.Set(reflect.MakeSlice(val.Type(), 1, MakeSliceCap))
+	if val.Len() == 0 {
+		if val.Kind() == reflect.Slice {
+			val.Set(reflect.MakeSlice(val.Type(), 1, MakeSliceCap))
+		} else {
+			return nil
+		}
 	}
+
+	var forks *fork.Fork
+	if f > 1 {
+		forks = fork.NewForkBuf(f, f*10)
+	}
+	k := 0
 	for v := range data {
 		if val.Len() == k {
 			if val.Kind() == reflect.Slice {
@@ -100,8 +119,9 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value, f
 				break
 			}
 		}
+
 		func(k int, v [][]byte) {
-			fo.Push(func() {
+			ff := func() {
 				d := reflect.New(tt).Elem()
 				if err := rs(key, v, d); err != nil {
 					return
@@ -111,11 +131,19 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value, f
 					d = d.Addr()
 				}
 				val.Index(k).Set(d)
-			})
+			}
+			if forks != nil {
+				forks.Push(ff)
+			} else {
+				ff()
+			}
+
 		}(k, v)
 		k++
 	}
-	fo.JoinMerge()
+	if forks != nil {
+		forks.JoinMerge()
+	}
 	if val.Kind() == reflect.Slice {
 		val.Set(val.Slice(0, k))
 	}
@@ -123,7 +151,8 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value, f
 }
 
 // rowsScanValuesChannel rows scan values
-func rowsScanValuesChannel(key []string, data chan [][]byte, val reflect.Value, fn func(reflect.StructField) string) error {
+func rowsScanValuesChannel(key []string, data chan [][]byte, val reflect.Value,
+	fn func(reflect.StructField) string, f int) error {
 	switch val.Kind() {
 	default:
 		return ErrInvalidType
@@ -131,11 +160,11 @@ func rowsScanValuesChannel(key []string, data chan [][]byte, val reflect.Value, 
 		if val.IsNil() {
 			val.Set(reflect.New(val.Type().Elem()))
 		}
-		return rowsScanValuesChannel(key, data, val.Elem(), fn)
+		return rowsScanValuesChannel(key, data, val.Elem(), fn, f)
 	case reflect.Slice:
 		fallthrough
 	case reflect.Array:
-		return rowsScanValueChannel(key, data, val, fn)
+		return rowsScanValueChannel(key, data, val, fn, f)
 	case reflect.Struct:
 		key0 := colAdjust(val.Type(), key, fn)
 		return rowScanStruct(key0, <-data, val)
