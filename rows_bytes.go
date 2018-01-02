@@ -33,7 +33,8 @@ func RowsLimitBytes(rows Rows, limit int) ([]string, [][][]byte, error) {
 	return key, data, nil
 }
 
-func RowsScanBytes(rows Rows, v interface{}, fn func(reflect.StructField) string) (int, error) {
+func RowsScanBytes(rows Rows, v interface{}, limit int,
+	fn func(reflect.StructField) string) (int, error) {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr {
 		return 0, ErrNotPointer
@@ -46,16 +47,19 @@ func RowsScanBytes(rows Rows, v interface{}, fn func(reflect.StructField) string
 		val = val.Elem()
 	}
 
-	limit := 0
+	l := 0
 	switch val.Kind() {
 	case reflect.Array:
-		limit = val.Len()
+		l = val.Len()
 	case reflect.Slice:
-		limit = -1
+		l = -1
 	default:
-		limit = 1
+		l = 1
 	}
-	return rowsScanBytes(rows, v, limit, fn)
+
+	l = getLimit(l, limit)
+
+	return rowsScanBytes(rows, v, l, fn)
 }
 
 func rowsScanBytes(rows Rows, v interface{}, limit int,

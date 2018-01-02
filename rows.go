@@ -12,6 +12,19 @@ type Rows interface {
 	Err() error
 }
 
+func getLimit(la, lb int) int {
+	if lb > 0 {
+		if la > 0 {
+			if la > lb {
+				la = lb
+			}
+		} else {
+			la = lb
+		}
+	}
+	return la
+}
+
 // DataScan
 // v should be a pointer type.
 // Support type:
@@ -33,7 +46,7 @@ type Rows interface {
 //
 // var ret [100]map[string]string
 // DataScan(key, data, &ret)
-func RowsScan(rows Rows, v interface{},
+func RowsScan(rows Rows, v interface{}, limit int,
 	fn func(reflect.StructField) string, f int) (int, error) {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr {
@@ -47,26 +60,26 @@ func RowsScan(rows Rows, v interface{},
 		val = val.Elem()
 	}
 
-	limit := 0
+	l := 0
 	switch val.Kind() {
 	case reflect.Array:
-		limit = val.Len()
-		if limit == 1 {
+		l = val.Len()
+		if l == 1 {
 			f = 0
 		}
 	case reflect.Slice:
-		limit = -1
+		l = -1
 	default:
-		limit = 1
+		l = 1
 		f = 0
 	}
 
+	l = getLimit(l, limit)
+
 	if f == 0 {
-		return rowsScanBytes(rows, v, limit, fn)
+		return rowsScanBytes(rows, v, l, fn)
 	} else if f > 0 {
-		return rowsScanChannel(rows, v, limit, fn, f)
-	} else {
-		return rowsScanChannel(rows, v, limit, fn, 3)
+		return rowsScanChannel(rows, v, l, fn, f-1)
 	}
 	return 0, nil
 }

@@ -40,7 +40,7 @@ func RowsLimitChannel(rows Rows, limit int) ([]string, chan [][]byte, error) {
 	return key, data, nil
 }
 
-func RowsScanChannel(rows Rows, v interface{},
+func RowsScanChannel(rows Rows, v interface{}, limit int,
 	fn func(reflect.StructField) string, f int) (int, error) {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr {
@@ -54,16 +54,19 @@ func RowsScanChannel(rows Rows, v interface{},
 		val = val.Elem()
 	}
 
-	limit := 0
+	l := 0
 	switch val.Kind() {
 	case reflect.Array:
-		limit = val.Len()
+		l = val.Len()
 	case reflect.Slice:
-		limit = -1
+		l = -1
 	default:
-		limit = 1
+		l = 1
 	}
-	return rowsScanChannel(rows, v, limit, fn, f)
+
+	l = getLimit(l, limit)
+
+	return rowsScanChannel(rows, v, l, fn, f)
 }
 
 func rowsScanChannel(rows Rows, v interface{}, limit int,
@@ -73,9 +76,6 @@ func rowsScanChannel(rows Rows, v interface{}, limit int,
 		return 0, err
 	}
 
-	if f--; f < 1 {
-		f = 1
-	}
 	err = DataScanChannel(key, data, v, fn, f)
 	if err != nil {
 		return 0, err
@@ -106,9 +106,11 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 		}
 	}
 
-	var forks *fork.Fork
+	var fr = func(f func()) { f() }
 	if f > 1 {
-		forks = fork.NewForkBuf(f, f*10)
+		forks := fork.NewForkBuf(f, f*10)
+		fr = forks.Push
+		defer forks.JoinMerge()
 	}
 	k := 0
 	for v := range data {
@@ -121,7 +123,7 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 		}
 
 		func(k int, v [][]byte) {
-			ff := func() {
+			fr(func() {
 				d := reflect.New(tt).Elem()
 				if err := rs(key, v, d); err != nil {
 					return
@@ -131,19 +133,11 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 					d = d.Addr()
 				}
 				val.Index(k).Set(d)
-			}
-			if forks != nil {
-				forks.Push(ff)
-			} else {
-				ff()
-			}
-
+			})
 		}(k, v)
 		k++
 	}
-	if forks != nil {
-		forks.JoinMerge()
-	}
+
 	if val.Kind() == reflect.Slice {
 		val.Set(val.Slice(0, k))
 	}
