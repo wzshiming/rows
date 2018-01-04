@@ -2,8 +2,6 @@ package rows
 
 import (
 	"reflect"
-
-	"github.com/wzshiming/fork"
 )
 
 var (
@@ -108,15 +106,24 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 
 	var fr = func(f func()) { f() }
 	if f > 1 {
-		forks := fork.NewForkBuf(f, f*10)
-		fr = forks.Push
-		defer forks.JoinMerge()
+		buf := make(chan func(), 1024)
+		fr = func(f func()) { buf <- f }
+		for i := 0; i != f; i++ {
+			go func() {
+				for v := range buf {
+					v()
+				}
+			}()
+		}
+		defer func() {
+			close(buf)
+		}()
 	}
 	k := 0
 	for v := range data {
-		if val.Len() == k {
+		if vl := val.Len(); vl == k {
 			if val.Kind() == reflect.Slice {
-				val.Set(reflect.AppendSlice(val, val))
+				val.Set(reflect.AppendSlice(val, reflect.MakeSlice(val.Type(), vl, vl)))
 			} else {
 				break
 			}
