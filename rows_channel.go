@@ -2,6 +2,7 @@ package rows
 
 import (
 	"reflect"
+	"sync"
 )
 
 var (
@@ -107,15 +108,23 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 	var fr = func(f func()) { f() }
 	if f > 1 {
 		buf := make(chan func(), 1024)
-		fr = func(f func()) { buf <- f }
+		wg := sync.WaitGroup{}
+
+		fr = func(f func()) {
+			wg.Add(1)
+			buf <- f
+		}
+
 		for i := 0; i != f; i++ {
 			go func() {
 				for v := range buf {
 					v()
+					wg.Done()
 				}
 			}()
 		}
 		defer func() {
+			wg.Wait()
 			close(buf)
 		}()
 	}
