@@ -2,9 +2,9 @@ package rows
 
 import "reflect"
 
-func DataScanBytes(key []string, data [][][]byte, v interface{}, fn func(reflect.StructField) string) error {
+func DataScanBytes(key []string, data [][][]byte, v interface{}, fn func(reflect.StructField) string) (int, error) {
 	if len(data) == 0 || len(key) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	val := reflect.ValueOf(v)
@@ -69,15 +69,11 @@ func rowsScanBytes(rows Rows, v interface{}, limit int,
 		return 0, err
 	}
 
-	err = DataScanBytes(key, data, v, fn)
-	if err != nil {
-		return 0, err
-	}
-	return len(data), nil
+	return DataScanBytes(key, data, v, fn)
 }
 
 // rowsScanValue rows scan value
-func rowsScanValueBytes(key []string, data [][][]byte, val reflect.Value, fn func(reflect.StructField) string) error {
+func rowsScanValueBytes(key []string, data [][][]byte, val reflect.Value, fn func(reflect.StructField) string) (int, error) {
 	tt := val.Type().Elem()
 	ps := 0
 	for tt.Kind() == reflect.Ptr {
@@ -87,35 +83,35 @@ func rowsScanValueBytes(key []string, data [][][]byte, val reflect.Value, fn fun
 
 	rs, err := rowsScanValueFunc(tt, key, fn)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if val.Len() == 0 {
 		if val.Kind() == reflect.Slice {
 			val.Set(reflect.MakeSlice(val.Type(), len(data), len(data)))
 		} else {
-			return nil
+			return 0, nil
 		}
 	}
 
 	for k, v := range data {
 		d := reflect.New(tt).Elem()
 		if err := rs(key, v, d); err != nil {
-			return err
+			return 0, err
 		}
 		for i := 0; i != ps; i++ {
 			d = d.Addr()
 		}
 		val.Index(k).Set(d)
 	}
-	return nil
+	return val.Len(), nil
 }
 
 // rowsScanValuesBytes rows scan values
-func rowsScanValuesBytes(key []string, data [][][]byte, val reflect.Value, fn func(reflect.StructField) string) error {
+func rowsScanValuesBytes(key []string, data [][][]byte, val reflect.Value, fn func(reflect.StructField) string) (int, error) {
 	switch val.Kind() {
 	default:
-		return ErrInvalidType
+		return 0, ErrInvalidType
 	case reflect.Ptr:
 		if val.IsNil() {
 			val.Set(reflect.New(val.Type().Elem()))
@@ -127,8 +123,8 @@ func rowsScanValuesBytes(key []string, data [][][]byte, val reflect.Value, fn fu
 		return rowsScanValueBytes(key, data, val, fn)
 	case reflect.Struct:
 		key0 := colAdjust(val.Type(), key, fn)
-		return rowScanStruct(key0, data[0], val)
+		return 1, rowScanStruct(key0, data[0], val)
 	case reflect.Map:
-		return rowScanMap(key, data[0], val)
+		return 1, rowScanMap(key, data[0], val)
 	}
 }

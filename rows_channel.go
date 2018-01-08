@@ -12,9 +12,9 @@ var (
 )
 
 func DataScanChannel(key []string, data chan [][]byte, v interface{},
-	fn func(reflect.StructField) string, f int) error {
+	fn func(reflect.StructField) string, f int) (int, error) {
 	if len(key) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	val := reflect.ValueOf(v)
@@ -75,16 +75,12 @@ func rowsScanChannel(rows Rows, v interface{}, limit int,
 		return 0, err
 	}
 
-	err = DataScanChannel(key, data, v, fn, f)
-	if err != nil {
-		return 0, err
-	}
-	return len(data), nil
+	return DataScanChannel(key, data, v, fn, f)
 }
 
 // rowsScanValueChannel rows scan value
 func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
-	fn func(reflect.StructField) string, f int) error {
+	fn func(reflect.StructField) string, f int) (int, error) {
 	tt := val.Type().Elem()
 	ps := 0
 	for tt.Kind() == reflect.Ptr {
@@ -94,21 +90,21 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 
 	rs, err := rowsScanValueFunc(tt, key, fn)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if val.Len() == 0 {
 		if val.Kind() == reflect.Slice {
 			val.Set(reflect.MakeSlice(val.Type(), 1, MakeSliceCap))
 		} else {
-			return nil
+			return 0, nil
 		}
 	}
 
-	var fr = func(f func()) { f() }
+	fr := func(f func()) { f() }
 	if f > 1 {
-		buf := make(chan func(), 1024)
 		wg := sync.WaitGroup{}
+		buf := make(chan func(), 1024)
 
 		fr = func(f func()) {
 			wg.Add(1)
@@ -128,6 +124,7 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 			close(buf)
 		}()
 	}
+
 	k := 0
 	for v := range data {
 		if vl := val.Len(); vl == k {
@@ -157,15 +154,16 @@ func rowsScanValueChannel(key []string, data chan [][]byte, val reflect.Value,
 	if val.Kind() == reflect.Slice {
 		val.Set(val.Slice(0, k))
 	}
-	return nil
+
+	return k, nil
 }
 
 // rowsScanValuesChannel rows scan values
 func rowsScanValuesChannel(key []string, data chan [][]byte, val reflect.Value,
-	fn func(reflect.StructField) string, f int) error {
+	fn func(reflect.StructField) string, f int) (int, error) {
 	switch val.Kind() {
 	default:
-		return ErrInvalidType
+		return 0, ErrInvalidType
 	case reflect.Ptr:
 		if val.IsNil() {
 			val.Set(reflect.New(val.Type().Elem()))
@@ -177,8 +175,8 @@ func rowsScanValuesChannel(key []string, data chan [][]byte, val reflect.Value,
 		return rowsScanValueChannel(key, data, val, fn, f)
 	case reflect.Struct:
 		key0 := colAdjust(val.Type(), key, fn)
-		return rowScanStruct(key0, <-data, val)
+		return 1, rowScanStruct(key0, <-data, val)
 	case reflect.Map:
-		return rowScanMap(key, <-data, val)
+		return 1, rowScanMap(key, <-data, val)
 	}
 }
