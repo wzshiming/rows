@@ -10,6 +10,7 @@ type Rows interface {
 	Columns() ([]string, error)
 	Scan(dest ...interface{}) error
 	Err() error
+	Close() error
 }
 
 func getLimit(la, lb int) int {

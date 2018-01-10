@@ -27,6 +27,8 @@ func RowsLimitBytes(rows Rows, limit int) ([]string, [][][]byte, error) {
 			data = append(data, d)
 		}
 	})
+	rows.Close()
+
 	if err != nil {
 		return nil, nil, err
 	}
