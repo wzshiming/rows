@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	nomenclature "gopkg.in/go-grm/nomenclature.v1"
 )
 
 var sm = sync.Map{}
@@ -73,7 +75,7 @@ func MakeFieldName(tag string) func(fn reflect.StructField) string {
 			return ""
 		}
 		if dd == "" {
-			return Hump2Snake(fn.Name)
+			return nomenclature.Hump2Snake(fn.Name)
 		}
 		return dd
 	}
