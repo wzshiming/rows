@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	nomenclature "gopkg.in/go-grm/nomenclature.v1"
+	namecase "gopkg.in/wzshiming/namecase.v2"
 )
 
 var sm = sync.Map{}
@@ -75,7 +75,7 @@ func MakeFieldName(tag string) func(fn reflect.StructField) string {
 			return ""
 		}
 		if dd == "" {
-			return nomenclature.Hump2Snake(fn.Name)
+			return namecase.ToLowerSnake(fn.Name)
 		}
 		return dd
 	}
