@@ -11,6 +11,7 @@ var (
 	MaxBuffer    = 1024
 )
 
+// DataScanChannel fill in key and data to v
 func DataScanChannel(key []string, data chan [][]byte, v interface{},
 	fn func(reflect.StructField) string, f int) (int, error) {
 	if len(key) == 0 {
@@ -39,6 +40,7 @@ func RowsLimitChannel(rows Rows, limit int) ([]string, chan [][]byte, error) {
 	return key, data, nil
 }
 
+// RowsScanChannel fill in rows to v
 func RowsScanChannel(rows Rows, v interface{}, limit int,
 	fn func(reflect.StructField) string, f int) (int, error) {
 	val := reflect.ValueOf(v)
@@ -68,6 +70,7 @@ func RowsScanChannel(rows Rows, v interface{}, limit int,
 	return rowsScanChannel(rows, v, l, fn, f)
 }
 
+// rowsScanChannel fill in rows to v
 func rowsScanChannel(rows Rows, v interface{}, limit int,
 	fn func(reflect.StructField) string, f int) (int, error) {
 	key, data, err := RowsLimitChannel(rows, limit)

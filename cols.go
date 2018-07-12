@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	namecase "gopkg.in/wzshiming/namecase.v2"
+	"github.com/wzshiming/namecase"
 )
 
 var sm = sync.Map{}
@@ -67,6 +67,7 @@ func colAdjustMap(tt reflect.Type, key []string, prefix []string, m map[string]i
 	return b
 }
 
+// MakeFieldName returns a function that gets the value of a field
 func MakeFieldName(tag string) func(fn reflect.StructField) string {
 	return func(fn reflect.StructField) string {
 		b := fn.Tag.Get(tag)

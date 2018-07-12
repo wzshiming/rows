@@ -5,6 +5,7 @@ import (
 	"reflect"
 )
 
+// Rows Handle multiline interfaces
 type Rows interface {
 	Next() bool
 	Columns() ([]string, error)
@@ -291,6 +292,7 @@ func rows2Table(key []string, data [][][]byte) [][]string {
 	return m
 }
 
+// makeBytesInterface returns the specified number of bytes interface arrays
 func makeBytesInterface(max int) []interface{} {
 	r := make([]interface{}, 0, max)
 	for i := 0; i != max; i++ {
@@ -299,6 +301,7 @@ func makeBytesInterface(max int) []interface{} {
 	return r
 }
 
+// rowsInterfaceToByte bytes interface arrays to bytes arrays
 func rowsInterfaceToByte(m []interface{}) [][]byte {
 	r0 := make([][]byte, 0, len(m))
 	for _, v := range m {
@@ -311,6 +314,7 @@ func rowsInterfaceToByte(m []interface{}) [][]byte {
 	return r0
 }
 
+// rowsScanValueFunc returns the traversal function
 func rowsScanValueFunc(tt reflect.Type, key []string, fn func(reflect.StructField) string) (func(key []string, d [][]byte, val reflect.Value) error, error) {
 	switch tt.Kind() {
 	default:

@@ -2,6 +2,7 @@ package rows
 
 import "reflect"
 
+// DataScanBytes fill in key and data to v
 func DataScanBytes(key []string, data [][][]byte, v interface{}, fn func(reflect.StructField) string) (int, error) {
 	if len(data) == 0 || len(key) == 0 {
 		return 0, nil
@@ -35,6 +36,7 @@ func RowsLimitBytes(rows Rows, limit int) ([]string, [][][]byte, error) {
 	return key, data, nil
 }
 
+// RowsScanBytes fill in rows to v
 func RowsScanBytes(rows Rows, v interface{}, limit int,
 	fn func(reflect.StructField) string) (int, error) {
 	val := reflect.ValueOf(v)
@@ -64,6 +66,7 @@ func RowsScanBytes(rows Rows, v interface{}, limit int,
 	return rowsScanBytes(rows, v, l, fn)
 }
 
+// rowsScanBytes fill in rows to v
 func rowsScanBytes(rows Rows, v interface{}, limit int,
 	fn func(reflect.StructField) string) (int, error) {
 	key, data, err := RowsLimitBytes(rows, limit)
