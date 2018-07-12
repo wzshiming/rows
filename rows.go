@@ -27,8 +27,7 @@ func getLimit(la, lb int) int {
 	return la
 }
 
-// DataScan
-// v should be a pointer type.
+// RowsScan v should be a pointer type.
 // Support type:
 //  Base Type
 //  struct
@@ -137,7 +136,6 @@ func rowScanSlice(key []string, d [][]byte, val reflect.Value) error {
 	case reflect.Slice:
 		return rowScanSliceValue(key, d, val)
 	}
-	return nil
 }
 
 // rowScanSliceValue row scan Slice value
@@ -150,7 +148,7 @@ func rowScanSliceValue(key []string, d [][]byte, val reflect.Value) error {
 	case reflect.String:
 		l := len(d)
 		val.Set(reflect.MakeSlice(tt, l, l))
-		for k, _ := range key {
+		for k := range key {
 			val.Index(k).Set(reflect.ValueOf(string(d[k])))
 		}
 	case reflect.Slice:
@@ -173,7 +171,6 @@ func rowScanMap(key []string, d [][]byte, val reflect.Value) error {
 	case reflect.Map:
 		return rowScanMapValue(key, d, val)
 	}
-	return nil
 }
 
 // rowScanMapValue row scan Map value
@@ -226,7 +223,6 @@ func rowScanStruct(key [][]string, d [][]byte, val reflect.Value) error {
 		}
 		return nil
 	}
-	return nil
 }
 
 // rows2MapStrings rows to map string

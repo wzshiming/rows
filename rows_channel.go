@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// Some global parameters
 var (
 	MaxForkSize  = 16
 	MakeSliceCap = 1024 * 16

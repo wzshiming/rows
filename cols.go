@@ -19,9 +19,8 @@ func colAdjust(tt reflect.Type, key []string, fn func(reflect.StructField) strin
 	if b {
 		if ss, ok := v.([][]string); ok && ss != nil && len(key) == len(ss) {
 			return ss
-		} else {
-			fmt.Println("error rows.colAdjust")
 		}
+		fmt.Println("error rows.colAdjust")
 	}
 
 	m := map[string]int{}
