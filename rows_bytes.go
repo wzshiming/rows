@@ -1,6 +1,8 @@
 package rows
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // DataScanBytes fill in key and data to v
 func DataScanBytes(key []string, data [][][]byte, v interface{}, fn func(reflect.StructField) string) (int, error) {

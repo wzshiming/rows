@@ -28,25 +28,23 @@ func getLimit(la, lb int) int {
 }
 
 // RowsScan v should be a pointer type.
-// Support type:
-//  Base Type
-//  struct
-//  *struct
-//  map[string]string
-//  *map[string]string
-//  map[string][]byte
-//  *map[string][]byte
-// List type:
-//  []
-//  [len]
+// SupportType:
+//   Basic Type
+//   Slices
+//   Array
+//   Pointer
+//   Struct
+//   map[string]string
+//   *map[string]string
+//   map[string][]byte
+//   *map[string][]byte
 // Example:
-//  [100]map[string]string   Get 100 lines to map
-//  map[string]string        Get 1 lines to map
-//  []*struct                All to *struct
-//  *[100]struct             Get 100 lines to struct
-//
-// var ret [100]map[string]string
-// DataScan(key, data, &ret)
+//   [100]map[string]string   Get 100 lines to map
+//   map[string]string        Get 1 lines to map
+//   []*struct                All to *struct
+//   *[100]struct             Get 100 lines to struct
+//   var ret [100]map[string]string
+//   DataScan(key, data, &ret)
 func RowsScan(rows Rows, v interface{}, limit int,
 	fn func(reflect.StructField) string, f int) (int, error) {
 	val := reflect.ValueOf(v)

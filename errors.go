@@ -1,6 +1,8 @@
 package rows
 
-import "errors"
+import (
+	"errors"
+)
 
 // Some common error definitions
 var (
