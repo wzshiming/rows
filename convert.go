@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+	"unsafe"
 )
 
 var (
@@ -101,4 +102,27 @@ func ConvertAssign(dest interface{}, src []byte) error {
 	}
 
 	return fmt.Errorf("unsupported Scan, storing driver.Value type %T into type %T", src, dest)
+}
+
+// StringToBytes string to []byte
+func StringToBytes(v string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&v))
+}
+
+// StringsToBytess []string to [][]byte
+func StringsToBytess(v []string) [][]byte {
+	buf := make([][]byte, 0, len(v))
+	for _, v := range v {
+		buf = append(buf, StringToBytes(v))
+	}
+	return buf
+}
+
+// StringssToBytesss [][]string to [][][]byte
+func StringssToBytesss(v [][]string) [][][]byte {
+	buf := make([][][]byte, 0, len(v))
+	for _, v := range v {
+		buf = append(buf, StringsToBytess(v))
+	}
+	return buf
 }
