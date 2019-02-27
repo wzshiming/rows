@@ -205,6 +205,9 @@ func rowScanStruct(key [][]string, d [][]byte, val reflect.Value) error {
 	case reflect.Ptr:
 		return rowScanStruct(key, d, val.Elem())
 	case reflect.Struct:
+		if len(key) > len(d) {
+			key = key[:len(d)]
+		}
 		for k, v := range key {
 			if len(v) == 0 {
 				continue
