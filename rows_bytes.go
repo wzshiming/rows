@@ -101,6 +101,10 @@ func rowsScanValueBytes(key []string, data [][][]byte, val reflect.Value, fn fun
 		}
 	}
 
+	vl := val.Len()
+	if vl < len(data) {
+		data = data[:vl]
+	}
 	for k, v := range data {
 		d := reflect.New(tt).Elem()
 		if err := rs(key, v, d); err != nil {
@@ -111,7 +115,7 @@ func rowsScanValueBytes(key []string, data [][][]byte, val reflect.Value, fn fun
 		}
 		val.Index(k).Set(d)
 	}
-	return val.Len(), nil
+	return vl, nil
 }
 
 // rowsScanValuesBytes rows scan values
