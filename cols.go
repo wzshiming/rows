@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-
-	"github.com/wzshiming/namecase"
 )
 
 var sm = sync.Map{}
@@ -75,7 +73,7 @@ func MakeFieldName(tag string) func(fn reflect.StructField) string {
 			return ""
 		}
 		if dd == "" {
-			return namecase.ToLowerSnake(fn.Name)
+			return strings.ToLower(fn.Name)
 		}
 		return dd
 	}
