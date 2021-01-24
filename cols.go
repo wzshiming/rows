@@ -1,7 +1,6 @@
 package rows
 
 import (
-	"fmt"
 	"go/ast"
 	"reflect"
 	"strings"
@@ -18,7 +17,6 @@ func colAdjust(tt reflect.Type, key []string, fn func(reflect.StructField) strin
 		if ss, ok := v.([][]string); ok && ss != nil && len(key) == len(ss) {
 			return ss
 		}
-		fmt.Println("error rows.colAdjust")
 	}
 
 	m := map[string]int{}
